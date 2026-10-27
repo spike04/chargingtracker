@@ -4,7 +4,7 @@ abstract final class AppDateFormatter {
   static final DateFormat _monthDay = DateFormat('MMM d');
   static final DateFormat _monthYear = DateFormat('MMMM yyyy');
   static final DateFormat _fullDate = DateFormat('MMM d, yyyy');
-  static final DateFormat _weekday = DateFormat('EEEE');
+  static final DateFormat _shortDate = DateFormat('EEE d MMM, yyyy');
   static final DateFormat _time = DateFormat('h:mm a');
   static final DateFormat _dateTime = DateFormat('MMM d, yyyy • h:mm a');
 
@@ -27,8 +27,7 @@ abstract final class AppDateFormatter {
     return switch (difference) {
       0 => 'Today',
       -1 => 'Yesterday',
-      >= -6 && < 0 => _weekday.format(date),
-      _ => _fullDate.format(date),
+      _ => _shortDate.format(date),
     };
   }
 

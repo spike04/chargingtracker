@@ -12,8 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
-  flutter_launcher_icons: ^0.9.3
-  flutter_native_splash: ^2.2.16
+  flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.4.0
   get_it: ^9.3.0
   injectable: ^3.0.0
   intl: ^0.20.3
