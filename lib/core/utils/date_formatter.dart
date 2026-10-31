@@ -31,6 +31,6 @@ abstract final class AppDateFormatter {
     };
   }
 
-  static String relativeDateTime(DateTime date) =>
-      '${relativeDay(date)} • ${time(date)}';
+  static String dayDateTime(DateTime date) =>
+      '${_shortDate.format(date)} • ${time(date)}';
 }

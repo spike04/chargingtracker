@@ -49,22 +49,39 @@ class SqliteChargingLocalDataSource implements ChargingLocalDataSource {
   @override
   Future<void> insertSession(ChargingSessionModel session) async {
     final database = await _database;
-    await database.insert(
-      AppConstants.sessionsTable,
-      session.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await database.transaction((transaction) async {
+      await transaction.insert(
+        AppConstants.sessionsTable,
+        session.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      await _rememberLocation(transaction, session.location);
+    });
   }
 
   @override
   Future<void> updateSession(ChargingSessionModel session) async {
     final database = await _database;
-    await database.update(
-      AppConstants.sessionsTable,
-      session.toMap(),
-      where: 'id = ?',
-      whereArgs: [session.id],
-    );
+    await database.transaction((transaction) async {
+      final previous = await transaction.query(
+        AppConstants.sessionsTable,
+        columns: ['location'],
+        where: 'id = ?',
+        whereArgs: [session.id],
+      );
+      await transaction.update(
+        AppConstants.sessionsTable,
+        session.toMap(),
+        where: 'id = ?',
+        whereArgs: [session.id],
+      );
+      // Only a changed location is remembered, so editing an old session does
+      // not bring back a location the user has removed.
+      if (previous.isNotEmpty &&
+          previous.first['location'] != session.location) {
+        await _rememberLocation(transaction, session.location);
+      }
+    });
   }
 
   @override
@@ -76,4 +93,30 @@ class SqliteChargingLocalDataSource implements ChargingLocalDataSource {
       whereArgs: [id],
     );
   }
+
+  @override
+  Future<List<String>> fetchLocations() async {
+    final database = await _database;
+    final rows = await database.query(
+      AppConstants.locationsTable,
+      orderBy: 'name',
+    );
+
+    return rows.map((row) => row['name']! as String).toList(growable: false);
+  }
+
+  @override
+  Future<void> deleteLocation(String location) async {
+    final database = await _database;
+    await database.delete(
+      AppConstants.locationsTable,
+      where: 'name = ?',
+      whereArgs: [location],
+    );
+  }
+
+  Future<void> _rememberLocation(DatabaseExecutor executor, String location) =>
+      executor.insert(AppConstants.locationsTable, {
+        'name': location,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
 }

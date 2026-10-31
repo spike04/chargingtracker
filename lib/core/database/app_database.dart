@@ -36,6 +36,8 @@ class AppDatabase {
           CREATE INDEX idx_${AppConstants.sessionsTable}_charged_at
           ON ${AppConstants.sessionsTable} (charged_at DESC)
         ''');
+
+        await _createLocationsTable(database);
       },
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -47,9 +49,22 @@ class AppDatabase {
             'ALTER TABLE ${AppConstants.sessionsTable} ADD COLUMN cost REAL',
           );
         }
+        if (oldVersion < 3) {
+          await _createLocationsTable(database);
+          await database.execute('''
+            INSERT OR IGNORE INTO ${AppConstants.locationsTable} (name)
+            SELECT DISTINCT location FROM ${AppConstants.sessionsTable}
+          ''');
+        }
       },
     );
   }
+
+  Future<void> _createLocationsTable(Database database) => database.execute('''
+    CREATE TABLE ${AppConstants.locationsTable} (
+      name TEXT PRIMARY KEY COLLATE NOCASE
+    )
+  ''');
 
   Future<void> close() async {
     await _database?.close();

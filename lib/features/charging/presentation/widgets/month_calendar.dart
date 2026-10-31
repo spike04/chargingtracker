@@ -8,7 +8,8 @@ import '../../domain/entities/charging_session.dart';
 ///
 /// Collapsed, only the week that holds the selected day (or today) is shown.
 /// Swiping down expands the full month and swiping up collapses it again, the
-/// same gesture Google Calendar uses.
+/// same gesture Google Calendar uses. Swiping sideways acts like the arrows:
+/// right goes to the previous period and left to the next one.
 ///
 /// Days are tappable so the caller can highlight the day and jump to its
 /// entries. Future days stay inert because a charge cannot be logged ahead of
@@ -67,10 +68,34 @@ class _MonthCalendarState extends State<MonthCalendar> {
 
   double _draggedDistance = 0;
 
+  /// Bumped whenever the visible period changes so the grid slides, while
+  /// expanding or collapsing keeps the same grid and only resizes it.
+  int _gridVersion = 0;
+  bool _slidesForward = true;
+
   MonthCalendar get _calendar => widget;
 
   static DateTime _startOfWeek(DateTime date) =>
       DateTime(date.year, date.month, date.day - date.weekday % 7);
+
+  static DateTime _visiblePeriod(MonthCalendar calendar) => calendar.expanded
+      ? DateTime(calendar.month.year, calendar.month.month)
+      : _startOfWeek(calendar.weekAnchor);
+
+  @override
+  void didUpdateWidget(MonthCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.expanded != oldWidget.expanded) {
+      return;
+    }
+
+    final previous = _visiblePeriod(oldWidget);
+    final current = _visiblePeriod(widget);
+    if (!DateUtils.isSameDay(previous, current)) {
+      _gridVersion++;
+      _slidesForward = current.isAfter(previous);
+    }
+  }
 
   void _goToPreviousPeriod() {
     final month = widget.month;
@@ -127,6 +152,32 @@ class _MonthCalendarState extends State<MonthCalendar> {
     }
   }
 
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    _draggedDistance += details.delta.dx;
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final dragged = _draggedDistance;
+    _draggedDistance = 0;
+
+    // A flick decides the direction, so one that reverses a drag still wins.
+    final double direction;
+    if (velocity.abs() > _swipeVelocity) {
+      direction = velocity;
+    } else if (dragged.abs() > _dragDistance) {
+      direction = dragged;
+    } else {
+      return;
+    }
+
+    if (direction > 0) {
+      _goToPreviousPeriod();
+    } else if (_canGoToNextPeriod(DateUtils.dateOnly(DateTime.now()))) {
+      _goToNextPeriod();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -174,15 +225,11 @@ class _MonthCalendarState extends State<MonthCalendar> {
       onVerticalDragStart: _onDragStart,
       onVerticalDragUpdate: _onDragUpdate,
       onVerticalDragEnd: _onDragEnd,
-      child: Container(
+      onHorizontalDragStart: _onDragStart,
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.55),
-          ),
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -255,32 +302,47 @@ class _MonthCalendarState extends State<MonthCalendar> {
               ],
             ),
             const SizedBox(height: 2),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (
-                    var row = firstRow;
-                    row < firstRow + visibleRowCount;
-                    row++
-                  )
-                    Row(
-                      children: [
-                        for (var column = 0; column < 7; column++)
-                          Expanded(
-                            child: _buildDayCell(
-                              context,
-                              row * 7 + column - leadingBlanks + 1,
-                              chargesByDate,
-                              today,
-                            ),
-                          ),
-                      ],
-                    ),
-                ],
+            // Sits inside the padding, so sliding dates stop at the same edge
+            // as the rest of the calendar. AnimatedSize only clips mid-resize.
+            ClipRect(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeInOutCubic,
+                  switchOutCurve: Curves.easeInOutCubic,
+                  // A new closure each build makes the switcher rebuild the
+                  // outgoing grid's transition, which sets its exit direction.
+                  transitionBuilder: (child, animation) =>
+                      _slideGrid(child, animation, forward: _slidesForward),
+                  layoutBuilder: _layoutGrids,
+                  child: Column(
+                    key: ValueKey(_gridVersion),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (
+                        var row = firstRow;
+                        row < firstRow + visibleRowCount;
+                        row++
+                      )
+                        Row(
+                          children: [
+                            for (var column = 0; column < 7; column++)
+                              Expanded(
+                                child: _buildDayCell(
+                                  context,
+                                  row * 7 + column - leadingBlanks + 1,
+                                  chargesByDate,
+                                  today,
+                                ),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -288,6 +350,37 @@ class _MonthCalendarState extends State<MonthCalendar> {
       ),
     );
   }
+
+  /// Moves the incoming and outgoing grids together, like turning a page.
+  Widget _slideGrid(
+    Widget child,
+    Animation<double> animation, {
+    required bool forward,
+  }) {
+    final isIncoming = child.key == ValueKey(_gridVersion);
+    final startsOnRight = isIncoming == forward;
+
+    return SlideTransition(
+      position: animation.drive(
+        Tween(begin: Offset(startsOnRight ? 1 : -1, 0), end: Offset.zero),
+      ),
+      child: child,
+    );
+  }
+
+  /// Sizes the switcher by the incoming grid, so a month with fewer rows
+  /// resizes during the slide rather than after it.
+  static Widget _layoutGrids(
+    Widget? currentChild,
+    List<Widget> previousChildren,
+  ) => Stack(
+    alignment: Alignment.topCenter,
+    children: [
+      for (final child in previousChildren)
+        Positioned(top: 0, left: 0, right: 0, child: child),
+      ?currentChild,
+    ],
+  );
 
   static String _monthStatLine(int charges, int addedPercentage) {
     if (charges == 0) {

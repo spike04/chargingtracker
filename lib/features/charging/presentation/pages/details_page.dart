@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/date_formatter.dart';
@@ -10,6 +11,7 @@ import '../utils/refresh_charging_data.dart';
 import '../widgets/add_session_sheet.dart';
 import '../widgets/async_state_views.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/frosted_bar.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/session_card.dart';
 
@@ -21,7 +23,12 @@ class DetailsPage extends StatefulWidget {
 }
 
 class _DetailsPageState extends State<DetailsPage> {
+  static const _contentConstraints = BoxConstraints(maxWidth: 900);
+
   final ScrollController _scrollController = ScrollController();
+
+  /// Measures the pinned calendar so a day never scrolls in underneath it.
+  final GlobalKey _calendarBarKey = GlobalKey();
 
   /// Keyed by day so a tapped date can scroll its entry group into view.
   final Map<DateTime, GlobalKey> _dayKeys = {};
@@ -114,13 +121,24 @@ class _DetailsPageState extends State<DetailsPage> {
 
   void _scrollToDay(DateTime day) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final target = _dayKeys[DateUtils.dateOnly(day)]?.currentContext;
-      if (target == null) {
+      final target = _dayKeys[DateUtils.dateOnly(day)]?.currentContext
+          ?.findRenderObject();
+      final barHeight = _calendarBarKey.currentContext?.size?.height;
+      if (target == null ||
+          barHeight == null ||
+          !_scrollController.hasClients) {
         return;
       }
-      Scrollable.ensureVisible(
+
+      final position = _scrollController.position;
+      final reveal = RenderAbstractViewport.of(
         target,
-        alignment: 0.02,
+      ).getOffsetToReveal(target, 0).offset;
+      _scrollController.animateTo(
+        (reveal - barHeight).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
       );
@@ -226,51 +244,86 @@ class _DetailsPageState extends State<DetailsPage> {
       final sessions = state.visibleSessions;
 
       return Scaffold(
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () =>
-              openChargingSessionSheet(context, initialDate: _selectedDay),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Log charge'),
+        floatingActionButton: Theme(
+          // Height is only configurable through the theme.
+          data: Theme.of(context).copyWith(
+            floatingActionButtonTheme: Theme.of(context)
+                .floatingActionButtonTheme
+                .copyWith(
+                  extendedSizeConstraints: const BoxConstraints.tightFor(
+                    height: 44,
+                  ),
+                ),
+          ),
+          child: FloatingActionButton.extended(
+            onPressed: () =>
+                openChargingSessionSheet(context, initialDate: _selectedDay),
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: const Text('Log charge'),
+            extendedPadding: const EdgeInsetsDirectional.only(
+              start: 12,
+              end: 16,
+            ),
+            extendedIconLabelSpacing: 6,
+            extendedTextStyle: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 13),
+          ),
         ),
-        body: SafeArea(
-          bottom: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: MonthCalendar(
-                      month: _visibleMonth,
-                      weekAnchor: _weekAnchor,
-                      sessions: state.sessions,
-                      selectedDay: _selectedDay,
-                      expanded: _isCalendarExpanded,
-                      onMonthChanged: _onMonthChanged,
-                      onWeekChanged: _onWeekChanged,
-                      onDaySelected: _onDaySelected,
-                      onTodayPressed: _onTodayPressed,
-                      onExpandedChanged: (expanded) {
-                        if (expanded == _isCalendarExpanded) {
-                          return;
-                        }
-                        setState(() {
-                          _isCalendarExpanded = expanded;
-                          if (!expanded) {
-                            _weekAnchor = _resolveWeekAnchor();
-                          }
-                        });
-                      },
+        body: RefreshIndicator(
+          edgeOffset: MediaQuery.paddingOf(context).top,
+          onRefresh: () => refreshChargingData(context),
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              PinnedHeaderSliver(
+                child: FrostedBar(
+                  key: _calendarBarKey,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: _contentConstraints,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: MonthCalendar(
+                            month: _visibleMonth,
+                            weekAnchor: _weekAnchor,
+                            sessions: state.sessions,
+                            selectedDay: _selectedDay,
+                            expanded: _isCalendarExpanded,
+                            onMonthChanged: _onMonthChanged,
+                            onWeekChanged: _onWeekChanged,
+                            onDaySelected: _onDaySelected,
+                            onTodayPressed: _onTodayPressed,
+                            onExpandedChanged: (expanded) {
+                              if (expanded == _isCalendarExpanded) {
+                                return;
+                              }
+                              setState(() {
+                                _isCalendarExpanded = expanded;
+                                if (!expanded) {
+                                  _weekAnchor = _resolveWeekAnchor();
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () => refreshChargingData(context),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(top: 2, bottom: 110),
+                ),
+              ),
+              SliverSafeArea(
+                top: false,
+                bottom: false,
+                sliver: SliverPadding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 110),
+                  sliver: SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: _contentConstraints,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -302,9 +355,9 @@ class _DetailsPageState extends State<DetailsPage> {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
@@ -404,14 +457,20 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
+    spacing: 6,
+    runSpacing: 6,
     children: [
       for (final filter in ChargingFilter.values)
         ChoiceChip(
           label: Text('${filter.label} ${filter.countIn(state)}'),
           selected: state.filter == filter,
           showCheckmark: false,
+          // Size only: a colour here would override the selected text colour.
+          labelStyle: const TextStyle(fontSize: 12),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           onSelected: (_) {
             context.read<ChargingBloc>().add(ChargingFilterChanged(filter));
           },

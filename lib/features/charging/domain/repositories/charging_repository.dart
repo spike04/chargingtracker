@@ -11,4 +11,8 @@ abstract interface class ChargingRepository {
   Future<void> updateSession(ChargingSession session);
 
   Future<void> deleteSession(String id);
+
+  Future<List<String>> getLocations();
+
+  Future<void> removeLocation(String location);
 }

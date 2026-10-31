@@ -20,10 +20,7 @@ Future<bool?> showChargingSessionSheet(
   backgroundColor: Colors.transparent,
   builder: (sheetContext) => BlocProvider.value(
     value: context.read<ChargingBloc>(),
-    child: _ChargingSessionSheet(
-      session: session,
-      initialDate: initialDate,
-    ),
+    child: _ChargingSessionSheet(session: session, initialDate: initialDate),
   ),
 );
 
@@ -63,13 +60,6 @@ class _ChargingSessionSheet extends StatefulWidget {
 }
 
 class _ChargingSessionSheetState extends State<_ChargingSessionSheet> {
-  static const _locationSuggestions = [
-    'Home',
-    'Office',
-    'Public charger',
-    'Highway',
-  ];
-
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _locationController;
   late final TextEditingController _energyController;
@@ -491,6 +481,8 @@ class _ChargingSessionSheetState extends State<_ChargingSessionSheet> {
                           textInputAction: TextInputAction.done,
                           decoration: const InputDecoration(
                             hintText: 'Where did you charge?',
+                            helperText:
+                                'New locations are saved for next time.',
                             prefixIcon: Icon(Icons.location_on_outlined),
                           ),
                           validator: (value) {
@@ -504,22 +496,34 @@ class _ChargingSessionSheetState extends State<_ChargingSessionSheet> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _locationSuggestions
-                              .map(
-                                (location) => ActionChip(
-                                  avatar: const Icon(
-                                    Icons.add_location_alt_outlined,
-                                    size: 16,
-                                  ),
-                                  label: Text(location),
-                                  onPressed: () => _setLocation(location),
-                                ),
-                              )
-                              .toList(growable: false),
+                        BlocSelector<ChargingBloc, ChargingState, List<String>>(
+                          selector: (state) => state.locations,
+                          builder: (context, locations) {
+                            if (locations.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: locations
+                                    .map(
+                                      (location) => InputChip(
+                                        label: Text(location),
+                                        onPressed: () => _setLocation(location),
+                                        onDeleted: () =>
+                                            context.read<ChargingBloc>().add(
+                                              ChargingLocationRemoved(location),
+                                            ),
+                                        deleteButtonTooltipMessage:
+                                            'Remove $location',
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 18),
                         Text(

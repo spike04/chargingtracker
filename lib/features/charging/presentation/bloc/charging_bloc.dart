@@ -5,6 +5,7 @@ import '../../../../core/error/failure.dart';
 import '../../domain/usecases/add_charging_session.dart';
 import '../../domain/usecases/delete_charging_session.dart';
 import '../../domain/usecases/get_charging_overview.dart';
+import '../../domain/usecases/remove_saved_location.dart';
 import '../../domain/usecases/update_charging_session.dart';
 import 'charging_event.dart';
 import 'charging_state.dart';
@@ -16,12 +17,14 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
     this._addSession,
     this._updateSession,
     this._deleteSession,
+    this._removeLocation,
   ) : super(const ChargingState()) {
     on<ChargingLoadRequested>(_onLoadRequested);
     on<ChargingRefreshRequested>(_onRefreshRequested);
     on<ChargingSessionAdded>(_onSessionAdded);
     on<ChargingSessionUpdated>(_onSessionUpdated);
     on<ChargingSessionDeleted>(_onSessionDeleted);
+    on<ChargingLocationRemoved>(_onLocationRemoved);
     on<ChargingFilterChanged>(_onFilterChanged);
     on<ChargingErrorDismissed>(_onErrorDismissed);
   }
@@ -30,6 +33,7 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
   final AddChargingSession _addSession;
   final UpdateChargingSession _updateSession;
   final DeleteChargingSession _deleteSession;
+  final RemoveSavedLocation _removeLocation;
 
   Future<void> _onLoadRequested(
     ChargingLoadRequested event,
@@ -89,6 +93,25 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
     await _refresh(emit);
   }
 
+  Future<void> _onLocationRemoved(
+    ChargingLocationRemoved event,
+    Emitter<ChargingState> emit,
+  ) async {
+    try {
+      await _removeLocation(event.location);
+    } catch (error) {
+      emit(state.copyWith(errorMessage: _messageFor(error)));
+      return;
+    }
+    emit(
+      state.copyWith(
+        locations: state.locations
+            .where((location) => location != event.location)
+            .toList(growable: false),
+      ),
+    );
+  }
+
   void _onFilterChanged(
     ChargingFilterChanged event,
     Emitter<ChargingState> emit,
@@ -111,6 +134,7 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
           status: ChargingStatus.loaded,
           sessions: overview.sessions,
           summary: overview.summary,
+          locations: overview.locations,
           isSaving: false,
           isDeleting: false,
           clearError: true,

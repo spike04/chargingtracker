@@ -45,6 +45,15 @@ final class ChargingSessionDeleted extends ChargingEvent {
   List<Object?> get props => [id];
 }
 
+final class ChargingLocationRemoved extends ChargingEvent {
+  const ChargingLocationRemoved(this.location);
+
+  final String location;
+
+  @override
+  List<Object?> get props => [location];
+}
+
 final class ChargingFilterChanged extends ChargingEvent {
   const ChargingFilterChanged(this.filter);
 

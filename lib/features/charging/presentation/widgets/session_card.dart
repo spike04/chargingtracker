@@ -88,7 +88,7 @@ class SessionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        AppDateFormatter.relativeDateTime(session.chargedAt),
+                        AppDateFormatter.dayDateTime(session.chargedAt),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(

@@ -11,4 +11,8 @@ abstract interface class ChargingLocalDataSource {
   Future<void> updateSession(ChargingSessionModel session);
 
   Future<void> deleteSession(String id);
+
+  Future<List<String>> fetchLocations();
+
+  Future<void> deleteLocation(String location);
 }

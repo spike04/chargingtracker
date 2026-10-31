@@ -43,6 +43,14 @@ class ChargingRepositoryImpl implements ChargingRepository {
   Future<void> deleteSession(String id) =>
       _guard(() => _localDataSource.deleteSession(id));
 
+  @override
+  Future<List<String>> getLocations() =>
+      _guard(_localDataSource.fetchLocations);
+
+  @override
+  Future<void> removeLocation(String location) =>
+      _guard(() => _localDataSource.deleteLocation(location));
+
   Future<T> _guard<T>(Future<T> Function() operation) async {
     try {
       return await operation();

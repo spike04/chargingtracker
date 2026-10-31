@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +13,7 @@ import '../widgets/add_session_sheet.dart';
 import '../widgets/async_state_views.dart';
 import '../widgets/cycle_history_grid.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/frosted_bar.dart';
 import '../widgets/session_card.dart';
 import '../widgets/stat_card.dart';
 
@@ -51,27 +50,7 @@ class DashboardPage extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
-          flexibleSpace: SizedBox.expand(
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withValues(alpha: 0.7),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          flexibleSpace: const SizedBox.expand(child: FrostedBar()),
           toolbarHeight: 76,
           titleSpacing: 16,
           title: Column(
