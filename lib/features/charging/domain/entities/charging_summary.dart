@@ -30,26 +30,4 @@ class ChargingSummary {
 
   double get averagePercentageAdded =>
       totalSessions == 0 ? 0 : totalPercentageAdded / totalSessions;
-
-  double get fastRatio => totalSessions == 0 ? 0 : fastCount / totalSessions;
-
-  double get slowRatio => totalSessions == 0 ? 0 : slowCount / totalSessions;
-
-  ChargingSummary copyWith({
-    int? totalSessions,
-    int? fastCount,
-    int? slowCount,
-    int? totalPercentageAdded,
-    DateTime? lastChargedAt,
-    double? totalEnergyKwh,
-    double? totalCost,
-  }) => ChargingSummary(
-    totalSessions: totalSessions ?? this.totalSessions,
-    fastCount: fastCount ?? this.fastCount,
-    slowCount: slowCount ?? this.slowCount,
-    totalPercentageAdded: totalPercentageAdded ?? this.totalPercentageAdded,
-    lastChargedAt: lastChargedAt ?? this.lastChargedAt,
-    totalEnergyKwh: totalEnergyKwh ?? this.totalEnergyKwh,
-    totalCost: totalCost ?? this.totalCost,
-  );
 }

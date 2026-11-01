@@ -83,11 +83,26 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
     ChargingSessionDeleted event,
     Emitter<ChargingState> emit,
   ) async {
-    emit(state.copyWith(isDeleting: true, clearError: true));
+    // Dismissible requires the row to leave the list as soon as it is swiped
+    // away, so the session goes first and comes back if the delete fails.
+    final previousSessions = state.sessions;
+    emit(
+      state.copyWith(
+        sessions: previousSessions
+            .where((session) => session.id != event.id)
+            .toList(growable: false),
+        clearError: true,
+      ),
+    );
     try {
       await _deleteSession(event.id);
     } catch (error) {
-      emit(state.copyWith(isDeleting: false, errorMessage: _messageFor(error)));
+      emit(
+        state.copyWith(
+          sessions: previousSessions,
+          errorMessage: _messageFor(error),
+        ),
+      );
       return;
     }
     await _refresh(emit);
@@ -136,7 +151,6 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
           summary: overview.summary,
           locations: overview.locations,
           isSaving: false,
-          isDeleting: false,
           clearError: true,
         ),
       );
@@ -147,7 +161,6 @@ class ChargingBloc extends Bloc<ChargingEvent, ChargingState> {
               ? ChargingStatus.failure
               : ChargingStatus.loaded,
           isSaving: false,
-          isDeleting: false,
           errorMessage: _messageFor(error),
         ),
       );

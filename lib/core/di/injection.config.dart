@@ -25,8 +25,12 @@ import '../../features/charging/domain/usecases/add_charging_session.dart'
     as _i1010;
 import '../../features/charging/domain/usecases/delete_charging_session.dart'
     as _i63;
+import '../../features/charging/domain/usecases/export_charging_backup.dart'
+    as _i524;
 import '../../features/charging/domain/usecases/get_charging_overview.dart'
     as _i595;
+import '../../features/charging/domain/usecases/import_charging_backup.dart'
+    as _i617;
 import '../../features/charging/domain/usecases/remove_saved_location.dart'
     as _i489;
 import '../../features/charging/domain/usecases/update_charging_session.dart'
@@ -56,8 +60,14 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i63.DeleteChargingSession>(
       () => _i63.DeleteChargingSession(gh<_i973.ChargingRepository>()),
     );
+    gh.lazySingleton<_i524.ExportChargingBackup>(
+      () => _i524.ExportChargingBackup(gh<_i973.ChargingRepository>()),
+    );
     gh.lazySingleton<_i595.GetChargingOverview>(
       () => _i595.GetChargingOverview(gh<_i973.ChargingRepository>()),
+    );
+    gh.lazySingleton<_i617.ImportChargingBackup>(
+      () => _i617.ImportChargingBackup(gh<_i973.ChargingRepository>()),
     );
     gh.lazySingleton<_i489.RemoveSavedLocation>(
       () => _i489.RemoveSavedLocation(gh<_i973.ChargingRepository>()),

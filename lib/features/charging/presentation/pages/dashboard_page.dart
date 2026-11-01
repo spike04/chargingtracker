@@ -8,6 +8,7 @@ import '../../domain/entities/charging_summary.dart';
 import '../bloc/charging_bloc.dart';
 import '../bloc/charging_event.dart';
 import '../bloc/charging_state.dart';
+import '../utils/charging_backup_actions.dart';
 import '../utils/refresh_charging_data.dart';
 import '../widgets/add_session_sheet.dart';
 import '../widgets/async_state_views.dart';
@@ -16,6 +17,10 @@ import '../widgets/empty_state.dart';
 import '../widgets/frosted_bar.dart';
 import '../widgets/session_card.dart';
 import '../widgets/stat_card.dart';
+
+const _horizontal = 16.0;
+
+enum _BackupAction { export, import }
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({required this.onViewAll, super.key});
@@ -77,6 +82,24 @@ class DashboardPage extends StatelessWidget {
                     ),
               icon: const Icon(Icons.refresh_rounded),
             ),
+            PopupMenuButton<_BackupAction>(
+              tooltip: 'Backup',
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (action) => switch (action) {
+                _BackupAction.export => exportChargingBackup(context),
+                _BackupAction.import => importChargingBackup(context),
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _BackupAction.export,
+                  child: Text('Export backup'),
+                ),
+                PopupMenuItem(
+                  value: _BackupAction.import,
+                  child: Text('Import backup'),
+                ),
+              ],
+            ),
             const SizedBox(width: 8),
           ],
         ),
@@ -85,104 +108,96 @@ class DashboardPage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 1100),
             child: RefreshIndicator(
               onRefresh: () => refreshChargingData(context),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  const horizontal = 16.0;
-
-                  return CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 110),
-                        sliver: SliverList.list(
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.paddingOf(context).top + 8,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: horizontal,
-                              ),
-                              child: CycleHistoryGrid(
-                                sessions: state.sessions,
-                                cycle: state.cycle,
-                                onLogCharge: () =>
-                                    openChargingSessionSheet(context),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: horizontal,
-                              ),
-                              child: _SectionHeader(
-                                title: 'At a glance',
-                                subtitle: 'Your charging habits in numbers',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: horizontal,
-                              ),
-                              child: _StatsGrid(summary: state.summary),
-                            ),
-                            const SizedBox(height: 24),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: horizontal,
-                              ),
-                              child: _SectionHeader(
-                                title: 'Recent activity',
-                                subtitle: state.sessions.isEmpty
-                                    ? 'Your latest sessions will show here'
-                                    : 'Your most recent charging sessions',
-                                action: TextButton(
-                                  onPressed: onViewAll,
-                                  child: const Text('View all'),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (state.sessions.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: horizontal,
-                                ),
-                                child: SizedBox(
-                                  height: 280,
-                                  child: EmptyState(
-                                    icon: Icons.ev_station_outlined,
-                                    title: 'No charging sessions yet',
-                                    message:
-                                        'Log your first charge to start '
-                                        'tracking your fast and slow cycles.',
-                                  ),
-                                ),
-                              )
-                            else
-                              for (final session in state.sessions.take(3)) ...[
-                                SessionCard(
-                                  session: session,
-                                  onEdit: () => openChargingSessionSheet(
-                                    context,
-                                    session: session,
-                                  ),
-                                ),
-                                Divider(
-                                  height: 1,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outlineVariant
-                                      .withValues(alpha: 0.35),
-                                ),
-                              ],
-                          ],
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 110),
+                    sliver: SliverList.list(
+                      children: [
+                        SizedBox(height: MediaQuery.paddingOf(context).top + 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _horizontal,
+                          ),
+                          child: CycleHistoryGrid(
+                            sessions: state.sessions,
+                            cycle: state.cycle,
+                            onLogCharge: () =>
+                                openChargingSessionSheet(context),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                        const SizedBox(height: 24),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _horizontal,
+                          ),
+                          child: _SectionHeader(
+                            title: 'At a glance',
+                            subtitle: 'Your charging habits in numbers',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _horizontal,
+                          ),
+                          child: _StatsGrid(summary: state.summary),
+                        ),
+                        const SizedBox(height: 24),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _horizontal,
+                          ),
+                          child: _SectionHeader(
+                            title: 'Recent activity',
+                            subtitle: state.sessions.isEmpty
+                                ? 'Your latest sessions will show here'
+                                : 'Your most recent charging sessions',
+                            action: TextButton(
+                              onPressed: onViewAll,
+                              child: const Text('View all'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (state.sessions.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: _horizontal,
+                            ),
+                            child: SizedBox(
+                              height: 280,
+                              child: EmptyState(
+                                icon: Icons.ev_station_outlined,
+                                title: 'No charging sessions yet',
+                                message:
+                                    'Log your first charge to start '
+                                    'tracking your fast and slow cycles.',
+                              ),
+                            ),
+                          )
+                        else
+                          for (final session in state.sessions.take(3)) ...[
+                            SessionCard(
+                              session: session,
+                              onEdit: () => openChargingSessionSheet(
+                                context,
+                                session: session,
+                              ),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

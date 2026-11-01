@@ -43,26 +43,4 @@ class ChargingSession {
       endPercentage <= 100 &&
       endPercentage > startPercentage &&
       location.trim().isNotEmpty;
-
-  ChargingSession copyWith({
-    String? id,
-    int? startPercentage,
-    int? endPercentage,
-    ChargingType? type,
-    String? location,
-    DateTime? chargedAt,
-    DateTime? createdAt,
-    double? energyKwh,
-    double? cost,
-  }) => ChargingSession(
-    id: id ?? this.id,
-    startPercentage: startPercentage ?? this.startPercentage,
-    endPercentage: endPercentage ?? this.endPercentage,
-    type: type ?? this.type,
-    location: location ?? this.location,
-    chargedAt: chargedAt ?? this.chargedAt,
-    createdAt: createdAt ?? this.createdAt,
-    energyKwh: energyKwh ?? this.energyKwh,
-    cost: cost ?? this.cost,
-  );
 }

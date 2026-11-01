@@ -13,7 +13,8 @@ import '../utils/charging_type_ui.dart';
 ///
 /// Layout rules
 /// ─────────────
-/// • One row = one cycle ([AppConstants.cycleLength] boxes, oldest first).
+/// • Each row holds [AppConstants.cycleLength] boxes, oldest first. A cycle
+///   with more fast charges than that carries on in the next row.
 /// • Boxes fill left-to-right; each logged entry lights up the next box.
 /// • Fast charge → teal hues, slow charge → amber hues.
 /// • Shade is relative to the amount added in that session, so heavy charges
@@ -21,8 +22,8 @@ import '../utils/charging_type_ui.dart';
 /// • Every open slot of the current cycle shows the charge it is waiting for:
 ///   teal bolts for the fast slots, amber for the slow slot that closes the
 ///   cycle. The amber turns strong once the slow charge is due next.
-/// • When the slow charge lands, the row fills, the cycle resets and the grid
-///   moves forward one full row (5 boxes).
+/// • A slow charge always closes its cycle, so a slow charge logged early
+///   leaves the rest of its row empty and the next cycle starts a new row.
 class CycleHistoryGrid extends StatelessWidget {
   const CycleHistoryGrid({
     required this.sessions,
@@ -47,15 +48,10 @@ class CycleHistoryGrid extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final ordered = [...sessions]
-      ..sort((a, b) => a.chargedAt.compareTo(b.chargedAt));
-
-    final completedCycles = ordered.length ~/ _cycleLen;
-    // Always keep the in-progress row visible, even when it is empty.
-    final totalRows = completedCycles + 1;
-    final shownRows = math.min(totalRows, _maxRows);
-    final firstRow = totalRows - shownRows;
-    final activeRow = totalRows - 1;
+    final cycles = ChargingCycle.group(sessions);
+    final completedCycles = cycles.length - 1;
+    final rows = _rowsFor(cycles);
+    final firstRow = math.max(0, rows.length - _maxRows);
 
     return Card(
       shape: RoundedRectangleBorder(
@@ -110,17 +106,17 @@ class CycleHistoryGrid extends StatelessWidget {
 
                 return Column(
                   children: [
-                    for (var row = firstRow; row < totalRows; row++)
+                    for (var row = firstRow; row < rows.length; row++)
                       Padding(
                         padding: EdgeInsets.only(
-                          bottom: row == totalRows - 1 ? 0 : 8,
+                          bottom: row == rows.length - 1 ? 0 : 8,
                         ),
                         child: _CycleRow(
-                          slots: _slotsForRow(ordered, row),
+                          slots: _slotsFor(rows[row]),
                           boxSize: boxSize,
                           actionWidth: actionWidth,
-                          isActive: row == activeRow,
-                          targetFast: cycle.targetFast,
+                          isActive: row == rows.length - 1,
+                          fastRemaining: cycle.fastRemaining,
                           onLogCharge: onLogCharge,
                           scheme: scheme,
                         ),
@@ -129,11 +125,11 @@ class CycleHistoryGrid extends StatelessWidget {
                 );
               },
             ),
-            if (totalRows > _maxRows)
+            if (rows.length > _maxRows)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
-                  'Showing the last $_maxRows of $totalRows cycles',
+                  'Showing the last $_maxRows of ${rows.length} rows',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
@@ -152,16 +148,29 @@ class CycleHistoryGrid extends StatelessWidget {
 
     final cycleWord = completedCycles == 1 ? 'cycle' : 'cycles';
     return '$completedCycles $cycleWord complete · '
-        '${cycle.total}/${cycle.targetTotal} this cycle';
+        '${cycle.fastCount}/${cycle.targetFast} fast this cycle';
   }
 
-  List<ChargingSession?> _slotsForRow(List<ChargingSession> ordered, int row) {
-    final start = row * _cycleLen;
-    return List.generate(_cycleLen, (i) {
-      final index = start + i;
-      return index < ordered.length ? ordered[index] : null;
-    });
+  /// Lays the cycles out in rows of [_cycleLen] boxes. The last row is always
+  /// the one being filled, so it is added even when it starts out empty.
+  List<List<ChargingSession>> _rowsFor(List<List<ChargingSession>> cycles) {
+    final rows = <List<ChargingSession>>[];
+    for (final cycle in cycles) {
+      for (var start = 0; start < cycle.length; start += _cycleLen) {
+        rows.add(
+          cycle.sublist(start, math.min(start + _cycleLen, cycle.length)),
+        );
+      }
+    }
+
+    if (cycles.last.length % _cycleLen == 0) {
+      rows.add(const []);
+    }
+    return rows;
   }
+
+  List<ChargingSession?> _slotsFor(List<ChargingSession> row) =>
+      List.generate(_cycleLen, (i) => i < row.length ? row[i] : null);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,7 +182,7 @@ class _CycleRow extends StatelessWidget {
     required this.boxSize,
     required this.actionWidth,
     required this.isActive,
-    required this.targetFast,
+    required this.fastRemaining,
     required this.onLogCharge,
     required this.scheme,
   });
@@ -182,7 +191,7 @@ class _CycleRow extends StatelessWidget {
   final double boxSize;
   final double actionWidth;
   final bool isActive;
-  final int targetFast;
+  final int fastRemaining;
   final VoidCallback onLogCharge;
   final ColorScheme scheme;
 
@@ -201,11 +210,7 @@ class _CycleRow extends StatelessWidget {
             ),
             child: _ChargeBox(
               session: slots[i],
-              // Open slots show what belongs in them: the first [targetFast]
-              // slots take a fast charge, the rest close the cycle slowly.
-              hintType: isActive && slots[i] == null
-                  ? (i < targetFast ? ChargingType.fast : ChargingType.slow)
-                  : null,
+              hintType: isActive ? _hintFor(i - filledCount) : null,
               isNext: i == nextIndex,
               size: boxSize,
               scheme: scheme,
@@ -220,6 +225,14 @@ class _CycleRow extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// What belongs in the open slot [openIndex] places after the last charge:
+  /// the remaining fast charges, then the slow one that closes the cycle.
+  ChargingType? _hintFor(int openIndex) {
+    if (openIndex < 0) return null;
+    if (openIndex < fastRemaining) return ChargingType.fast;
+    return openIndex == fastRemaining ? ChargingType.slow : null;
   }
 }
 
@@ -438,7 +451,8 @@ class _NextUpHint extends StatelessWidget {
     if (!hasSessions) {
       return (
         Icons.grid_view_rounded,
-        'Log five charges to complete a cycle — the slow one closes it.',
+        'Log ${cycle.targetFast} fast charges, then a slow one to close the '
+            'cycle.',
         scheme.onSurfaceVariant,
       );
     }
@@ -453,7 +467,7 @@ class _NextUpHint extends StatelessWidget {
     }
 
     if (cycle.needsFast) {
-      final remaining = cycle.targetFast - cycle.fastCount;
+      final remaining = cycle.fastRemaining;
       return (
         ChargingType.fast.icon,
         '$remaining more fast ${remaining == 1 ? 'charge' : 'charges'} '

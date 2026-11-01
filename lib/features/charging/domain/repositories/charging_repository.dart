@@ -15,4 +15,10 @@ abstract interface class ChargingRepository {
   Future<List<String>> getLocations();
 
   Future<void> removeLocation(String location);
+
+  Future<String> exportBackup();
+
+  /// Adds whatever [backup] holds that is not stored yet and returns the
+  /// number of new sessions. Stored sessions are left exactly as they are.
+  Future<int> importBackup(String backup);
 }

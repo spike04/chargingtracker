@@ -1,14 +1,11 @@
 import 'package:intl/intl.dart';
 
 abstract final class AppDateFormatter {
-  static final DateFormat _monthDay = DateFormat('MMM d');
   static final DateFormat _monthYear = DateFormat('MMMM yyyy');
   static final DateFormat _fullDate = DateFormat('MMM d, yyyy');
   static final DateFormat _shortDate = DateFormat('EEE d MMM, yyyy');
   static final DateFormat _time = DateFormat('h:mm a');
   static final DateFormat _dateTime = DateFormat('MMM d, yyyy • h:mm a');
-
-  static String shortDate(DateTime date) => _monthDay.format(date);
 
   static String monthYear(DateTime date) => _monthYear.format(date);
 

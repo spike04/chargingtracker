@@ -115,6 +115,37 @@ class SqliteChargingLocalDataSource implements ChargingLocalDataSource {
     );
   }
 
+  @override
+  Future<int> insertMissing(
+    List<ChargingSessionModel> sessions,
+    List<String> locations,
+  ) async {
+    final database = await _database;
+    return database.transaction((transaction) async {
+      final before = await _countSessions(transaction);
+      for (final session in sessions) {
+        await transaction.insert(
+          AppConstants.sessionsTable,
+          session.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      // Only the saved list counts, so a location removed before the backup
+      // was made stays removed even though old sessions still mention it.
+      for (final location in locations) {
+        await _rememberLocation(transaction, location);
+      }
+      return await _countSessions(transaction) - before;
+    });
+  }
+
+  Future<int> _countSessions(DatabaseExecutor executor) async {
+    final rows = await executor.rawQuery(
+      'SELECT COUNT(*) AS total FROM ${AppConstants.sessionsTable}',
+    );
+    return rows.first['total']! as int;
+  }
+
   Future<void> _rememberLocation(DatabaseExecutor executor, String location) =>
       executor.insert(AppConstants.locationsTable, {
         'name': location,

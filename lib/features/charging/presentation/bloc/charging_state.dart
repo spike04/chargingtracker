@@ -16,7 +16,6 @@ class ChargingState extends Equatable {
     this.locations = const [],
     this.filter = ChargingFilter.all,
     this.isSaving = false,
-    this.isDeleting = false,
     this.errorMessage,
   });
 
@@ -26,7 +25,6 @@ class ChargingState extends Equatable {
   final List<String> locations;
   final ChargingFilter filter;
   final bool isSaving;
-  final bool isDeleting;
   final String? errorMessage;
 
   bool get isLoading => status == ChargingStatus.loading;
@@ -59,7 +57,6 @@ class ChargingState extends Equatable {
     List<String>? locations,
     ChargingFilter? filter,
     bool? isSaving,
-    bool? isDeleting,
     String? errorMessage,
     bool clearError = false,
   }) => ChargingState(
@@ -69,7 +66,6 @@ class ChargingState extends Equatable {
     locations: locations ?? this.locations,
     filter: filter ?? this.filter,
     isSaving: isSaving ?? this.isSaving,
-    isDeleting: isDeleting ?? this.isDeleting,
     errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
   );
 
@@ -81,7 +77,6 @@ class ChargingState extends Equatable {
     locations,
     filter,
     isSaving,
-    isDeleting,
     errorMessage,
   ];
 }

@@ -132,7 +132,7 @@ class _ChargingSessionSheetState extends State<_ChargingSessionSheet> {
     final text = raw?.trim() ?? '';
     if (text.isEmpty) return null;
     final value = double.tryParse(text);
-    if (value == null) return 'Enter a number.';
+    if (value == null || !value.isFinite) return 'Enter a number.';
     if (value < 0) return 'Cannot be negative.';
     return null;
   }
