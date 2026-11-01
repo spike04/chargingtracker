@@ -29,6 +29,7 @@ class CycleHistoryGrid extends StatelessWidget {
     required this.sessions,
     required this.cycle,
     required this.onLogCharge,
+    this.compact = false,
     super.key,
   });
 
@@ -36,12 +37,17 @@ class CycleHistoryGrid extends StatelessWidget {
   final ChargingCycle cycle;
   final VoidCallback onLogCharge;
 
+  /// The one row home screen version: the title, the row being filled and the
+  /// action. It leaves out tooltips too, as they need an [Overlay], which the
+  /// offscreen render does not have.
+  final bool compact;
+
   static const _cycleLen = AppConstants.cycleLength;
   static const _gap = 7.0;
   static const _actionWidth = 92.0;
+  static const _maxRows = 6;
   static const _actionGap = 12.0;
   static const _maxBoxSize = 46.0;
-  static const _maxRows = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +57,8 @@ class CycleHistoryGrid extends StatelessWidget {
     final cycles = ChargingCycle.group(sessions);
     final completedCycles = cycles.length - 1;
     final rows = _rowsFor(cycles);
-    final firstRow = math.max(0, rows.length - _maxRows);
+    final maxRows = compact ? 1 : _maxRows;
+    final firstRow = math.max(0, rows.length - maxRows);
 
     return Card(
       shape: RoundedRectangleBorder(
@@ -59,7 +66,9 @@ class CycleHistoryGrid extends StatelessWidget {
         side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.55)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        padding: compact
+            ? const EdgeInsets.fromLTRB(16, 10, 16, 10)
+            : const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,13 +86,15 @@ class CycleHistoryGrid extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _subtitle(completedCycles),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                      if (!compact) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          _subtitle(completedCycles),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -91,7 +102,7 @@ class CycleHistoryGrid extends StatelessWidget {
                 _Legend(scheme: scheme),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: compact ? 8 : 14),
             LayoutBuilder(
               builder: (context, constraints) {
                 const gaps = _gap * (_cycleLen - 1);
@@ -117,6 +128,7 @@ class CycleHistoryGrid extends StatelessWidget {
                           actionWidth: actionWidth,
                           isActive: row == rows.length - 1,
                           fastRemaining: cycle.fastRemaining,
+                          showTooltips: !compact,
                           onLogCharge: onLogCharge,
                           scheme: scheme,
                         ),
@@ -125,18 +137,20 @@ class CycleHistoryGrid extends StatelessWidget {
                 );
               },
             ),
-            if (rows.length > _maxRows)
+            if (!compact && rows.length > maxRows)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
-                  'Showing the last $_maxRows of ${rows.length} rows',
+                  'Showing the last $maxRows of ${rows.length} rows',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
                 ),
               ),
-            const SizedBox(height: 14),
-            _NextUpHint(cycle: cycle, hasSessions: sessions.isNotEmpty),
+            if (!compact) ...[
+              const SizedBox(height: 14),
+              _NextUpHint(cycle: cycle, hasSessions: sessions.isNotEmpty),
+            ],
           ],
         ),
       ),
@@ -183,6 +197,7 @@ class _CycleRow extends StatelessWidget {
     required this.actionWidth,
     required this.isActive,
     required this.fastRemaining,
+    required this.showTooltips,
     required this.onLogCharge,
     required this.scheme,
   });
@@ -192,6 +207,7 @@ class _CycleRow extends StatelessWidget {
   final double actionWidth;
   final bool isActive;
   final int fastRemaining;
+  final bool showTooltips;
   final VoidCallback onLogCharge;
   final ColorScheme scheme;
 
@@ -212,6 +228,7 @@ class _CycleRow extends StatelessWidget {
               session: slots[i],
               hintType: isActive ? _hintFor(i - filledCount) : null,
               isNext: i == nextIndex,
+              showTooltip: showTooltips,
               size: boxSize,
               scheme: scheme,
             ),
@@ -244,6 +261,7 @@ class _ChargeBox extends StatelessWidget {
     required this.session,
     required this.hintType,
     required this.isNext,
+    required this.showTooltip,
     required this.size,
     required this.scheme,
   });
@@ -251,6 +269,7 @@ class _ChargeBox extends StatelessWidget {
   final ChargingSession? session;
   final ChargingType? hintType;
   final bool isNext;
+  final bool showTooltip;
   final double size;
   final ColorScheme scheme;
 
@@ -264,41 +283,46 @@ class _ChargeBox extends StatelessWidget {
         scheme: scheme,
         hintType: hintType,
         isNext: isNext,
+        showTooltip: showTooltip,
       );
     }
 
     final color = _tint(filled.type.color(scheme), filled.addedPercentage);
+
+    final box = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(size * 0.24),
+        border: Border.all(
+          color: filled.type.color(scheme).withValues(alpha: 0.85),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.28),
+            blurRadius: 7,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Icon(
+          filled.type.icon,
+          size: size * 0.44,
+          color: Colors.white.withValues(alpha: 0.92),
+        ),
+      ),
+    );
+
+    if (!showTooltip) return box;
 
     return Tooltip(
       message:
           '${filled.type.label} charge · +${filled.addedPercentage}%\n'
           '${AppDateFormatter.dateTime(filled.chargedAt)}',
       waitDuration: const Duration(milliseconds: 350),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(size * 0.24),
-          border: Border.all(
-            color: filled.type.color(scheme).withValues(alpha: 0.85),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.28),
-              blurRadius: 7,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            filled.type.icon,
-            size: size * 0.44,
-            color: Colors.white.withValues(alpha: 0.92),
-          ),
-        ),
-      ),
+      child: box,
     );
   }
 
@@ -325,12 +349,14 @@ class _EmptyBox extends StatelessWidget {
     required this.scheme,
     required this.hintType,
     required this.isNext,
+    required this.showTooltip,
   });
 
   final double size;
   final ColorScheme scheme;
   final ChargingType? hintType;
   final bool isNext;
+  final bool showTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +397,7 @@ class _EmptyBox extends StatelessWidget {
       ),
     );
 
-    if (hint == null) return box;
+    if (hint == null || !showTooltip) return box;
 
     return Tooltip(
       message: isNext

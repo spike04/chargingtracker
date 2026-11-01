@@ -14,6 +14,7 @@ dependencies:
     sdk: flutter
   flutter_bloc: ^9.1.1
   get_it: ^9.3.0
+  home_widget: ^0.10.0
   injectable: ^3.0.0
   intl: ^0.20.3
   path: ^1.9.1

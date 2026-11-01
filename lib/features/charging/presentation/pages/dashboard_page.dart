@@ -19,6 +19,7 @@ import '../widgets/session_card.dart';
 import '../widgets/stat_card.dart';
 
 const _horizontal = 16.0;
+const _toolbarHeight = 76.0;
 
 enum _BackupAction { export, import }
 
@@ -56,7 +57,7 @@ class DashboardPage extends StatelessWidget {
           elevation: 0,
           scrolledUnderElevation: 0,
           flexibleSpace: const SizedBox.expand(child: FrostedBar()),
-          toolbarHeight: 76,
+          toolbarHeight: _toolbarHeight,
           titleSpacing: 16,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +116,13 @@ class DashboardPage extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 8, bottom: 110),
                     sliver: SliverList.list(
                       children: [
-                        SizedBox(height: MediaQuery.paddingOf(context).top + 8),
+                        // The bar floats over the list, which has to start below it.
+                        SizedBox(
+                          height:
+                              MediaQuery.paddingOf(context).top +
+                              _toolbarHeight +
+                              8,
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: _horizontal,
